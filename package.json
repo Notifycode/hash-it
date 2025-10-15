@@ -1,13 +1,15 @@
 {
   "name": "@notifycode/hash-it",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "module": "src/index.ts",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": ["dist"],
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir=dist --minify --target=node"
+    "build": "bun build ./src/index.ts --outdir=dist --minify --target=node",
+    "types": "tsc --project tsconfig.build.json",
+    "prepare": "bun run build && bun run types"
   },
   "keywords": ["bun", "crypto", "token", "aes", "typescript"],
   "author": "Neza",
