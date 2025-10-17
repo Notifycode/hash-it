@@ -1,22 +1,31 @@
 {
   "name": "@notifycode/hash-it",
-  "version": "0.0.2",
-  "module": "src/index.ts",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "files": ["dist"],
-  "scripts": {
-    "build": "bun build ./src/index.ts --outdir=dist --minify --target=node",
-    "types": "tsc --project tsconfig.build.json",
-    "prepare": "bun run build && bun run types"
-  },
-  "keywords": ["bun", "crypto", "token", "aes", "typescript"],
+  "version": "0.0.5",
   "author": "Neza",
+  "main": "./dist/index.js",
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "typescript": "^5.2.0"
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist"],
+  "keywords": ["bun", "crypto", "token", "aes", "typescript"],
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir=dist --minify --target=node --format=esm --outfile=dist/index.js",
+    "types": "tsc --project tsconfig.build.json",
+    "prepare": "bun run build && bun run types"
+  },
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "@types/crypto-js": "^4.2.2"
   }
 }
