@@ -1,66 +1,47 @@
-import CryptoJS from 'crypto-js';
+import { createCipheriv, createDecipheriv, randomBytes, pbkdf2Sync } from 'crypto';
 import type { TokenCryptoParams } from './types';
 
+const ALGORITHM = 'aes-256-cbc';
+const IV_LENGTH = 16;
 const SALT = 'token-crypto-lib';
-const KEY_SIZE = 256 / 32; // AES-256 = 32 bytes
-const ITERATIONS = 100_000;
+const KEY_LENGTH = 32; // AES-256 = 32 bytes
 
-/**
- * Derives a key using PBKDF2 (sync and cossmpatible)
- */
-function deriveKey(key: string): CryptoJS.lib.WordArray {
+function deriveKey(key: string): Buffer {
   if (key.length < 6) {
     throw new Error('Key must be at least 6 characters long');
   }
 
-  return CryptoJS.PBKDF2(key, SALT, {
-    keySize: KEY_SIZE,
-    iterations: ITERATIONS,
-    hasher: CryptoJS.algo.SHA256,
-  });
+  return pbkdf2Sync(key, SALT, 100_000, KEY_LENGTH, 'sha256');
 }
 
 /**
- * Encrypts a token using AES with a derived key
+ * Encrypts a token using a flexible-length key (min 6 chars)
  */
 export function hashToken({ token, key }: TokenCryptoParams): string {
   const derivedKey = deriveKey(key);
-  const iv = CryptoJS.lib.WordArray.random(16); // 128-bit IV
+  const iv = randomBytes(IV_LENGTH);
+  const cipher = createCipheriv(ALGORITHM, derivedKey, iv);
 
-  const encrypted = CryptoJS.AES.encrypt(token, derivedKey, {
-    iv,
-    mode: CryptoJS.mode.CBC,
-    padding: CryptoJS.pad.Pkcs7,
-  });
+  const encrypted = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
 
-  return `${CryptoJS.enc.Base64.stringify(iv)}:${encrypted.ciphertext.toString(CryptoJS.enc.Base64)}`;
+  return `${iv.toString('base64')}:${encrypted.toString('base64')}`;
 }
 
 /**
- * Decrypts an encrypted token using the same derived key
+ * Decrypts a token using the same flexible-length key
  */
 export function decodeHashedToken({ token, key }: TokenCryptoParams): string {
   const [ivBase64, encryptedBase64] = token.split(':');
-
   if (!ivBase64 || !encryptedBase64) {
     throw new Error('Invalid token format. Expected IV:EncryptedToken');
   }
 
-  const iv = CryptoJS.enc.Base64.parse(ivBase64);
-  const ciphertext = CryptoJS.enc.Base64.parse(encryptedBase64);
+  const iv = Buffer.from(ivBase64, 'base64');
+  const encrypted = Buffer.from(encryptedBase64, 'base64');
   const derivedKey = deriveKey(key);
 
-  const decrypted = CryptoJS.AES.decrypt(
-    {
-      ciphertext,
-    } as any,
-    derivedKey,
-    {
-      iv,
-      mode: CryptoJS.mode.CBC,
-      padding: CryptoJS.pad.Pkcs7,
-    }
-  );
+  const decipher = createDecipheriv(ALGORITHM, derivedKey, iv);
+  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
 
-  return decrypted.toString(CryptoJS.enc.Utf8);
+  return decrypted.toString('utf8');
 }
