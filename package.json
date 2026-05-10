@@ -1,0 +1,78 @@
+{
+  "name": "@notifycode/hash-it",
+  "version": "1.0.0",
+  "description": "Enterprise-grade token and password security library with Mastercard-style public/private key token verification — built for Bun & Node.js",
+  "author": "Neza",
+  "license": "MIT",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "types": "./dist/types/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "SECURITY.md",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "crypto",
+    "token",
+    "password",
+    "argon2",
+    "aes",
+    "rsa",
+    "ecdsa",
+    "jwt",
+    "hash",
+    "security",
+    "encryption",
+    "pbkdf2",
+    "bun",
+    "typescript",
+    "enterprise",
+    "mastercard",
+    "bank-grade",
+    "session"
+  ],
+  "scripts": {
+    "build": "npm run build:esm && npm run build:cjs && npm run build:types",
+    "build:esm": "node esbuild.mjs esm",
+    "build:cjs": "node esbuild.mjs cjs",
+    "build:types": "tsc --project tsconfig.build.json",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest --coverage",
+    "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
+    "lint": "eslint src/**/*.ts tests/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts tests/**/*.ts --fix",
+    "audit": "npm audit",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run lint && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "esbuild": "^0.21.5",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.4",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/notifycode/hash-it"
+  },
+  "bugs": {
+    "url": "https://github.com/notifycode/hash-it/issues"
+  },
+  "homepage": "https://github.com/notifycode/hash-it#readme"
+}
