@@ -30,7 +30,7 @@ import type {
   PublicKeySet,
 } from '../types/index.js';
 import { HashItErrorCode } from '../types/index.js';
-import { HashItError, InvalidTokenError, SignatureInvalidError } from '../utils/errors.js';
+import { HashItError } from '../utils/errors.js';
 import { base64urlEncode, base64urlDecode, nowSeconds, generateJti, parseDuration } from '../utils/helpers.js';
 import { findKeyInSet } from './keys.js';
 
@@ -197,7 +197,7 @@ export function verifyToken(
   }
 
   // ── 2. Algorithm check ──────────────────────────────────────────────────────
-  const algorithm = header.alg as SignatureAlgorithm;
+  const algorithm = header.alg;
 
   if (!algorithm || !(algorithm in ALGORITHM_MAP)) {
     return { valid: false, error: `Unsupported algorithm: ${algorithm}` };
@@ -232,7 +232,7 @@ export function verifyToken(
       }
       resolvedPublicKey = result;
     } else {
-      const keyEntry = findKeyInSet(publicKey as PublicKeySet, kid);
+      const keyEntry = findKeyInSet(publicKey, kid);
       if (!keyEntry) {
         return { valid: false, error: `Key not found: ${kid}` };
       }
@@ -277,17 +277,17 @@ export function verifyToken(
   // ── 5. Claims validation ─────────────────────────────────────────────────────
   const now = nowSeconds();
 
-  if (payload.exp !== undefined && now > (payload.exp as number) + clockSkew) {
+  if (payload.exp !== undefined && now > (payload.exp) + clockSkew) {
     return {
       valid: false,
-      error: `Token expired at ${new Date((payload.exp as number) * 1000).toISOString()}`,
+      error: `Token expired at ${new Date((payload.exp) * 1000).toISOString()}`,
     };
   }
 
-  if (payload.nbf !== undefined && now < (payload.nbf as number) - clockSkew) {
+  if (payload.nbf !== undefined && now < (payload.nbf) - clockSkew) {
     return {
       valid: false,
-      error: `Token not valid until ${new Date((payload.nbf as number) * 1000).toISOString()}`,
+      error: `Token not valid until ${new Date((payload.nbf) * 1000).toISOString()}`,
     };
   }
 

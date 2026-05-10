@@ -1,6 +1,39 @@
 import { signToken, verifyToken, decodeToken } from '../src/core/token.js';
 import { generateKeyPair, exportPublicKey, buildKeySet } from '../src/core/keys.js';
 import { hashit } from '../src/hashit.js';
+import { SignatureAlgorithm } from '../src/index.js';
+
+interface PayloadType {
+  sub?: string;
+  kid?: string;
+  iat: number;
+  exp: number;
+  iss?: string;
+  aud?: string | string[];
+  role?: string;
+  org?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Parse token parts safely without assertions.
+ */
+function parsePayload<T = Record<string, unknown>>(token: string) {
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    throw new Error('Invalid token format: expected 3 parts');
+  }
+
+  const header = JSON.parse(
+    parts[0] ? Buffer.from(parts[0], 'base64url').toString() : ''
+  ) as { alg: string; kid?: string };
+
+  const payload = JSON.parse(
+    parts[1] ? Buffer.from(parts[1], 'base64url').toString() : ''
+  ) as T;
+
+  return { header, payload, signature: parts[2] };
+}
 
 describe('Token Signing & Verification — Mastercard-style', () => {
   let keyPair: ReturnType<typeof generateKeyPair>;
@@ -12,7 +45,7 @@ describe('Token Signing & Verification — Mastercard-style', () => {
   // ── signToken ──────────────────────────────────────────────────────────────
 
   describe('signToken', () => {
-    it('should produce a 3-part JWT-compatible token', () => {
+    it('should produce a 3-part token format', () => {
       const token = signToken({ sub: 'user123' }, { privateKey: keyPair.privateKey });
       const parts = token.split('.');
       expect(parts).toHaveLength(3);
@@ -23,14 +56,14 @@ describe('Token Signing & Verification — Mastercard-style', () => {
         { sub: 'user123' },
         { privateKey: keyPair.privateKey, kid: keyPair.kid }
       );
-      const header = JSON.parse(Buffer.from(token.split('.')[0]!, 'base64url').toString());
+      const { header } = parsePayload(token);
       expect(header.kid).toBe(keyPair.kid);
     });
 
     it('should set iat (issued at) automatically', () => {
       const before = Math.floor(Date.now() / 1000);
       const token = signToken({ sub: 'user123' }, { privateKey: keyPair.privateKey });
-      const payload = JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString());
+      const { payload } = parsePayload<PayloadType>(token);
       expect(payload.iat).toBeGreaterThanOrEqual(before);
     });
 
@@ -39,7 +72,7 @@ describe('Token Signing & Verification — Mastercard-style', () => {
         { sub: 'user123' },
         { privateKey: keyPair.privateKey, expiresIn: '1h' }
       );
-      const payload = JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString());
+      const { payload } = parsePayload<PayloadType>(token);
       expect(payload.exp).toBeGreaterThan(payload.iat);
     });
 
@@ -48,7 +81,7 @@ describe('Token Signing & Verification — Mastercard-style', () => {
         { sub: 'user123' },
         { privateKey: keyPair.privateKey, expiresIn: 3600 }
       );
-      const payload = JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString());
+      const { payload } = parsePayload<PayloadType>(token);
       expect(payload.exp - payload.iat).toBe(3600);
     });
 
@@ -61,7 +94,7 @@ describe('Token Signing & Verification — Mastercard-style', () => {
           audience: 'my-client',
         }
       );
-      const payload = JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString());
+      const { payload } = parsePayload<PayloadType>(token);
       expect(payload.iss).toBe('my-service');
       expect(payload.aud).toBe('my-client');
     });
@@ -74,7 +107,7 @@ describe('Token Signing & Verification — Mastercard-style', () => {
           claims: { role: 'admin', org: 'acme' },
         }
       );
-      const payload = JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString());
+      const { payload } = parsePayload<PayloadType>(token);
       expect(payload.role).toBe('admin');
       expect(payload.org).toBe('acme');
     });
@@ -87,7 +120,7 @@ describe('Token Signing & Verification — Mastercard-style', () => {
 
     it('should throw on invalid algorithm', () => {
       expect(() =>
-        signToken({ sub: 'user' }, { privateKey: keyPair.privateKey, algorithm: 'HS256' as any })
+        signToken({ sub: 'user' }, { privateKey: keyPair.privateKey, algorithm: 'HS256' as SignatureAlgorithm})
       ).toThrow();
     });
   });
@@ -140,7 +173,7 @@ describe('Token Signing & Verification — Mastercard-style', () => {
       expect(result.error).toContain('expired');
     });
 
-    it('should accept within clock skew tolerance', async () => {
+    it('should accept within clock skew tolerance', () => {
       const token = signToken(
         { sub: 'user123' },
         { privateKey: keyPair.privateKey, expiresIn: -5 }
@@ -192,7 +225,7 @@ describe('Token Signing & Verification — Mastercard-style', () => {
     });
 
     it('should return valid=false for malformed token', () => {
-      const result = verifyToken('not.a.valid.jwt.format', { publicKey: keyPair.publicKey });
+      const result = verifyToken('not.a.valid.format', { publicKey: keyPair.publicKey });
       expect(result.valid).toBe(false);
     });
 

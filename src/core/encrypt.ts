@@ -17,10 +17,23 @@ import {
   randomBytes,
   pbkdf2Sync,
   createHmac,
+  Cipher,
+  Decipher,
 } from 'crypto';
 import type { EncryptOptions, EncryptResult, EncryptionAlgorithm } from '../types/index.js';
 import { HashItErrorCode } from '../types/index.js';
 import { HashItError } from '../utils/errors.js';
+
+// ── Type Interfaces ───────────────────────────────────────────────────────────
+
+interface AeadCipher extends Cipher {
+  setAAD(aad: Buffer | ArrayBufferView, options?: { plaintextLength: number }): Cipher;
+  getAuthTag(): Buffer;
+}
+
+interface AeadDecipher extends Decipher {
+  setAuthTag(tag: Buffer | ArrayBufferView): void;
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -105,13 +118,10 @@ export function seal(
 }
 
 function sealGcm(plaintext: string, key: Buffer, iv: Buffer, aad?: string): EncryptResult {
-  const cipher = createCipheriv('aes-256-gcm', key, iv) as ReturnType<typeof createCipheriv> & {
-    getAuthTag(): Buffer;
-    setAAD(aad: Buffer): void;
-  };
+  const cipher = createCipheriv('aes-256-gcm', key, iv) as AeadCipher;
 
   if (aad) {
-    (cipher as any).setAAD(Buffer.from(aad, 'utf8'));
+    cipher.setAAD(Buffer.from(aad, 'utf8'));
   }
 
   const encrypted = Buffer.concat([
@@ -119,7 +129,7 @@ function sealGcm(plaintext: string, key: Buffer, iv: Buffer, aad?: string): Encr
     cipher.final(),
   ]);
 
-  const tag = (cipher as any).getAuthTag() as Buffer;
+  const tag = cipher.getAuthTag();
 
   return {
     ciphertext: encrypted.toString('base64url'),
@@ -132,14 +142,14 @@ function sealGcm(plaintext: string, key: Buffer, iv: Buffer, aad?: string): Encr
 function sealChaCha(plaintext: string, key: Buffer, iv: Buffer, aad?: string): EncryptResult {
   const cipher = createCipheriv('chacha20-poly1305', key, iv, {
     authTagLength: 16,
-  }) as any;
+  }) as AeadCipher;
 
   if (aad) {
-    cipher.setAAD(Buffer.from(aad, 'utf8'));
+    cipher.setAAD(Buffer.from(aad, 'utf8'), { plaintextLength: plaintext.length });
   }
 
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-  const tag = cipher.getAuthTag() as Buffer;
+  const tag = cipher.getAuthTag();
 
   return {
     ciphertext: encrypted.toString('base64url'),
@@ -204,7 +214,7 @@ function openGcm(ciphertext: string, key: Buffer, iv: Buffer, tagB64?: string): 
     throw new HashItError('GCM authentication tag is required', HashItErrorCode.DECRYPT_FAILED);
   }
 
-  const decipher = createDecipheriv('aes-256-gcm', key, iv) as any;
+  const decipher = createDecipheriv('aes-256-gcm', key, iv) as AeadDecipher;
   decipher.setAuthTag(Buffer.from(tagB64, 'base64url'));
 
   const decrypted = Buffer.concat([
@@ -222,7 +232,7 @@ function openChaCha(ciphertext: string, key: Buffer, iv: Buffer, tagB64?: string
 
   const decipher = createDecipheriv('chacha20-poly1305', key, iv, {
     authTagLength: 16,
-  }) as any;
+  }) as AeadDecipher;
 
   decipher.setAuthTag(Buffer.from(tagB64, 'base64url'));
   const decrypted = Buffer.concat([

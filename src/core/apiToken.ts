@@ -45,7 +45,7 @@ export function generateApiToken(keyPair: KeyPair, options?: ApiTokenOptions): A
   } = options ?? {};
 
   const now = nowSeconds();
-  const expiresAt = expiresIn != null ? now + parseDuration(expiresIn) : null;
+  const expiresAt = expiresIn !== null ? now + parseDuration(expiresIn) : null;
 
   const payload = {
     ...claims,
@@ -57,7 +57,7 @@ export function generateApiToken(keyPair: KeyPair, options?: ApiTokenOptions): A
     privateKey: keyPair.privateKey,
     kid: keyPair.kid,
     algorithm: keyPair.algorithm,
-    ...(expiresIn != null ? { expiresIn } : {}),
+    ...(expiresIn !== null ? { expiresIn } : {}),
   });
 
   const token = `${prefix}${jwt}`;

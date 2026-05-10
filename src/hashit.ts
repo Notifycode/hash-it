@@ -31,7 +31,7 @@
  * const apiToken = hashit.apiToken.generate(keyPair, { prefix: 'myapp_' });
  */
 
-import type { HashItInterface } from './types/index.js';
+import type { Argon2Options, HashItInterface } from './types/index.js';
 
 import { hashPassword, verifyPassword, needsRehash } from './core/password.js';
 import { signToken, verifyToken, decodeToken } from './core/token.js';
@@ -66,7 +66,7 @@ export const hashit: HashItInterface = {
      * @example
      * const { hash } = await hashit.password.hash('my-password');
      */
-    hash: hashPassword,
+    hash: async (password: string, options?: Argon2Options) => hashPassword(password, options),
 
     /**
      * Verify a password against a stored hash.
@@ -75,7 +75,7 @@ export const hashit: HashItInterface = {
      * @example
      * const { valid, needsRehash } = await hashit.password.verify('my-password', storedHash);
      */
-    verify: verifyPassword,
+   verify: async (password: string, storedHash: string) => verifyPassword(password, storedHash),
 
     /**
      * Check if a stored hash needs re-hashing (e.g. parameters upgraded).

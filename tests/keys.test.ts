@@ -1,6 +1,7 @@
 import { generateKeyPair, exportPublicKey, buildKeySet, findKeyInSet } from '../src/core/keys.js';
 import { InvalidKeyError } from '../src/utils/errors.js';
 import { hashit } from '../src/hashit.js';
+import { SignatureAlgorithm } from '../src/index.js';
 
 describe('Key Management — hashit.keys', () => {
   describe('generateKeyPair', () => {
@@ -41,7 +42,7 @@ describe('Key Management — hashit.keys', () => {
     });
 
     it('should throw on unsupported algorithm', () => {
-      expect(() => generateKeyPair({ algorithm: 'HS256' as any })).toThrow(InvalidKeyError);
+      expect(() => generateKeyPair({ algorithm: 'HS256' as SignatureAlgorithm })).toThrow(InvalidKeyError);
     });
 
     it('should set createdAt as a valid ISO date string', () => {

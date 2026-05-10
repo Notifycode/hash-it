@@ -312,8 +312,8 @@ describe('Utilities — hashit.utils', () => {
     });
 
     it('should return false for non-string inputs', () => {
-      expect(safeEqual(null as any, 'abc')).toBe(false);
-      expect(safeEqual('abc', undefined as any)).toBe(false);
+      expect(safeEqual(null as unknown as string, 'abc')).toBe(false);
+      expect(safeEqual('abc', undefined as unknown as string)).toBe(false);
     });
   });
 

@@ -13,7 +13,7 @@ import {
   AudienceMismatchError,
   IssuerMismatchError,
 } from '../src/utils/errors.js';
-import { HashItErrorCode } from '../src/types/index.js';
+import { EncryptionAlgorithm, HashItErrorCode } from '../src/types/index.js';
 import { seal, open } from '../src/core/encrypt.js';
 import { signToken, verifyToken } from '../src/core/token.js';
 import { generateKeyPair } from '../src/core/keys.js';
@@ -132,7 +132,7 @@ describe('Encryption edge cases', () => {
 
   it('should fail to open gcm with missing tag (via cast)', () => {
     const s = seal('data', 'my-gcm-key-12345');
-    const noTag = { ...s, tag: '' } as any; // force missing tag scenario
+    const noTag = { ...s, tag: '' }; // force missing tag scenario
     // Either throws or returns wrong data — encryption integrity is protected
     try {
       open(noTag, 'my-gcm-key-12345');
@@ -142,7 +142,7 @@ describe('Encryption edge cases', () => {
   });
 
   it('should throw on unsupported algorithm', () => {
-    expect(() => seal('data', 'key12345678', { algorithm: 'des-cbc' as any })).toThrow();
+    expect(() => seal('data', 'key12345678', { algorithm: 'des-cbc'  as EncryptionAlgorithm })).toThrow();
   });
 
   it('chacha20-poly1305 encrypt/decrypt', () => {
@@ -150,9 +150,9 @@ describe('Encryption edge cases', () => {
     try {
       const s = seal('chacha data', 'chacha-key-12345', { algorithm: 'chacha20-poly1305' });
       expect(open(s, 'chacha-key-12345')).toBe('chacha data');
-    } catch (e: any) {
+    } catch (e: unknown) {
       // May not be supported in all Node 18 builds — skip gracefully
-      expect(e.message).toMatch(/unsupported|Unknown/i);
+      expect((e as Error).message).toMatch(/unsupported|Unknown/i);
     }
   });
 });
@@ -212,10 +212,11 @@ describe('Token edge cases', () => {
 
   it('verifyToken with PublicKeySet and no kid falls back to trying all keys', () => {
     const kp2 = generateKeyPair({ kid: 'key-no-kid' });
-    const { buildKeySet, exportPublicKey } = { buildKeySet: (keys: any) => ({ keys }), exportPublicKey: (k: any) => ({ kid: k.kid, algorithm: k.algorithm, publicKey: k.publicKey, createdAt: k.createdAt }) };
+    const buildKeySet = (keys: Array<{ kid: string; algorithm: string; publicKey: string; createdAt: number }>) => ({ keys });
+    const exportPublicKey = (k: ReturnType<typeof generateKeyPair>) => ({ kid: k.kid || 'default-kid', algorithm: k.algorithm as unknown as string, publicKey: k.publicKey, createdAt: typeof k.createdAt === 'string' ? parseInt(k.createdAt, 10) : k.createdAt });
     const token = signToken({ sub: 'u1' }, { privateKey: kp2.privateKey }); // no kid in header
     const keySet = buildKeySet([exportPublicKey(kp2)]);
-    const result = verifyToken(token, { publicKey: keySet });
+    const result = verifyToken(token, { publicKey: keySet as unknown as typeof kp.publicKey });
     expect(result.valid).toBe(true);
   });
 
@@ -286,7 +287,7 @@ describe('Additional branch coverage', () => {
   it('password.ts: verifyPassword on malformed hash returns false', async () => {
     const { verifyPassword } = await import('../src/core/password.js');
     const badHash = '$hashit-argon2id$v1$onlyonepart';
-    const result = await verifyPassword('password', badHash);
+    const result = verifyPassword('password', badHash);
     expect(result.valid).toBe(false);
   });
 

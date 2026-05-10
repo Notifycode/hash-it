@@ -27,6 +27,26 @@ import type {
 import { HashItErrorCode } from '../types/index.js';
 import { HashItError } from '../utils/errors.js';
 
+// ── Types ────────────────────────────────────────────────────────────────────
+
+/**
+ * Decoded Argon2id parameters from hash string
+ */
+interface Argon2idParams {
+  m: number;
+  t: number;
+  p: number;
+}
+
+/**
+ * Decoded PBKDF2 parameters from hash string
+ */
+interface Pbkdf2Params {
+  i: number;
+  kl: number;
+  d: 'sha256' | 'sha384' | 'sha512';
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 /** OWASP-recommended Argon2id parameters (2023) */
@@ -93,7 +113,7 @@ function argon2idHash(password: string, salt: Buffer, options: Required<Argon2Op
   }
 
   // Phase 3: Final XOR + hash (simulates Argon2id's finalization)
-  let combined = Buffer.alloc(options.hashLength, 0);
+  const combined = Buffer.alloc(options.hashLength, 0);
   for (const block of memoryBlocks) {
     for (let i = 0; i < combined.length; i++) {
       combined[i] = (combined[i] as number) ^ (block[i] as number);
@@ -137,23 +157,25 @@ function decodeArgon2idHash(encoded: string): {
     throw new HashItError('Invalid Argon2id hash format', HashItErrorCode.INVALID_TOKEN);
   }
 
-  const [paramStr, saltB64, hashB64] = parts;
-  const params = Object.fromEntries(
-    (paramStr as string).split(',').map((p) => {
-      const [k, v] = p.split('=');
-      return [k, parseInt(v as string, 10)];
-    })
-  );
+  const [paramStr, saltB64, hashB64] = parts as [string, string, string];
+  
+  const params: Argon2idParams = Object.fromEntries(
+  paramStr.split(',').map((p) => {
+    const [k, v] = p.split('=');
+    return [k, parseInt(v ?? '0', 10)];
+  })
+) as unknown as Argon2idParams;
+
 
   return {
-    hash: Buffer.from(hashB64 as string, 'base64url'),
-    salt: Buffer.from(saltB64 as string, 'base64url'),
+    hash: Buffer.from(hashB64, 'base64url'),
+    salt: Buffer.from(saltB64, 'base64url'),
     options: {
-      memoryCost: (params['m'] as number) ?? ARGON2ID_DEFAULTS.memoryCost,
-      timeCost: (params['t'] as number) ?? ARGON2ID_DEFAULTS.timeCost,
-      parallelism: (params['p'] as number) ?? ARGON2ID_DEFAULTS.parallelism,
-      hashLength: Buffer.from(hashB64 as string, 'base64url').length,
-      saltLength: Buffer.from(saltB64 as string, 'base64url').length,
+      memoryCost: params.m ?? ARGON2ID_DEFAULTS.memoryCost,
+      timeCost: params.t ?? ARGON2ID_DEFAULTS.timeCost,
+      parallelism: params.p ?? ARGON2ID_DEFAULTS.parallelism,
+      hashLength: Buffer.from(hashB64, 'base64url').length,
+      saltLength: Buffer.from(saltB64, 'base64url').length,
     },
   };
 }
@@ -164,13 +186,13 @@ function decodeArgon2idHash(encoded: string): {
  * Hash a password using Argon2id with OWASP-recommended parameters.
  *
  * @example
- * const result = await hashPassword('my-secret-password');
+ * const result = hashPassword('my-secret-password');
  * console.log(result.hash); // $hashit-argon2id$v1$m=65536,t=3,p=4$...
  */
-export async function hashPassword(
+export function hashPassword(
   password: string,
   options?: Argon2Options
-): Promise<HashResult> {
+): HashResult {
   if (!password || typeof password !== 'string') {
     throw new HashItError('Password must be a non-empty string', HashItErrorCode.INVALID_PARAMS);
   }
@@ -204,13 +226,13 @@ export async function hashPassword(
  * Uses constant-time comparison to prevent timing attacks.
  *
  * @example
- * const result = await verifyPassword('my-secret-password', storedHash);
+ * const result = verifyPassword('my-secret-password', storedHash);
  * if (result.valid) { ... }
  */
-export async function verifyPassword(
+export function verifyPassword(
   password: string,
   storedHash: string
-): Promise<VerifyResult> {
+): VerifyResult {
   if (!password || !storedHash) {
     return { valid: false, needsRehash: false, timingMs: 0 };
   }
@@ -276,10 +298,10 @@ export function needsRehash(storedHash: string, options?: Argon2Options): boolea
 /**
  * Hash a password using PBKDF2 (for legacy compatibility or constrained environments).
  */
-export async function hashPasswordPbkdf2(
+export function hashPasswordPbkdf2(
   password: string,
   options?: Pbkdf2Options
-): Promise<HashResult> {
+): HashResult {
   if (!password || typeof password !== 'string') {
     throw new HashItError('Password must be a non-empty string', HashItErrorCode.INVALID_PARAMS);
   }
@@ -309,20 +331,22 @@ function verifyPbkdf2(password: string, storedHash: string, start: number): Veri
     return { valid: false, needsRehash: false, timingMs: Date.now() - start };
   }
 
-  const [paramStr, saltB64, hashB64] = parts;
-  const params = Object.fromEntries(
-    (paramStr as string).split(',').map((p) => {
-      const [k, v] = p.split('=');
-      return [k, v];
-    })
-  );
+  const [paramStr, saltB64, hashB64] = parts as [string, string, string];
+  
+  const params: Pbkdf2Params = Object.fromEntries(
+  paramStr.split(',').map((p) => {
+    const [k, v] = p.split('=');
+    return [k, k === 'd' ? (v ?? 'sha512') : parseInt(v ?? '0', 10)];
+  })
+) as unknown as Pbkdf2Params;
+  
 
-  const iterations = parseInt(params['i'] as string, 10);
-  const keyLength = parseInt(params['kl'] as string, 10);
-  const digest = (params['d'] as 'sha256' | 'sha384' | 'sha512') || 'sha512';
+  const iterations = params.i;
+  const keyLength = params.kl;  
+  const digest = params.d || 'sha512';
 
-  const salt = Buffer.from(saltB64 as string, 'base64url');
-  const storedHashBuf = Buffer.from(hashB64 as string, 'base64url');
+  const salt = Buffer.from(saltB64, 'base64url');
+  const storedHashBuf = Buffer.from(hashB64, 'base64url');
   const candidateHash = pbkdf2Sync(password, salt, iterations, keyLength, digest);
 
   const valid = timingSafeEqual(candidateHash, storedHashBuf);
