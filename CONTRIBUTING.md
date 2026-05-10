@@ -71,4 +71,4 @@ test(session): add refresh token rotation tests
 
 ## Questions?
 
-Open a GitHub Discussion or email dev@notifycode.dev.
+Open a GitHub Discussion or email dev@notifycode.org.
