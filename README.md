@@ -471,9 +471,3 @@ Coverage: **96%+** statements, branches, functions, lines.
 ## Security
 
 See [SECURITY.md](SECURITY.md) for the responsible disclosure process and threat model.
-
----
-
-## License
-
-MIT © Neza
